@@ -68,4 +68,9 @@ public final class LogUtil {
     public static void error(String message, Throwable throwable) {
         LOGGER.log(Level.SEVERE, message, throwable);
     }
+
+    /** 没有异常对象时只记消息，避免调用方为了凑参数传 null */
+    public static void error(String message) {
+        LOGGER.severe(message);
+    }
 }
