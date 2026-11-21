@@ -2,6 +2,8 @@ package com.accountbook.domain;
 
 import com.accountbook.exception.ValidationException;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 
 /**
@@ -75,7 +77,9 @@ public class Entry {
      * 金额用 double 存储，求和后必须规整，否则会出现 0.30000000000000004。
      */
     public static double round2(double value) {
-        return Math.round(value * 100.0) / 100.0;
+        return BigDecimal.valueOf(value)
+                .setScale(2, RoundingMode.HALF_UP)
+                .doubleValue();
     }
 
     public String getId() {

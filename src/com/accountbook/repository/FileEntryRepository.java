@@ -84,21 +84,52 @@ public class FileEntryRepository implements EntryRepository {
         }
 
         List<Entry> result = new ArrayList<>();
+        StringBuilder record = null;
+        int startLine = 0;
         for (int i = 0; i < lines.size(); i++) {
             String line = lines.get(i);
-            if (line.trim().isEmpty()) {
-                continue;
+            if (record == null) {
+                if (line.trim().isEmpty()) {
+                    continue;
+                }
+                record = new StringBuilder(line);
+                startLine = i + 1;
+            } else {
+                // 上一条记录的双引号还没闭合，说明备注里有换行，把这一行接回去
+                record.append('\n').append(line);
             }
-            try {
-                result.add(parseLine(line));
-            } catch (RuntimeException e) {
-                LogUtil.error("账本文件第 " + (i + 1) + " 行无法解析：" + line, e);
-                throw new StorageException(
-                        "账本文件第 " + (i + 1) + " 行损坏：" + e.getMessage() + "（" + file.toAbsolutePath() + "）", e);
+            if (isQuoteBalanced(record)) {
+                parseAndAdd(record.toString(), startLine, result);
+                record = null;
             }
+        }
+        if (record != null) {
+            throw new StorageException(
+                    "账本文件第 " + startLine + " 行起双引号未闭合（" + file.toAbsolutePath() + "）");
         }
         LogUtil.info("已从 " + file.toAbsolutePath() + " 加载 " + result.size() + " 条记录");
         return result;
+    }
+
+    /** 双引号个数为偶数就算闭合（"" 转义也成对出现，不影响奇偶） */
+    private static boolean isQuoteBalanced(CharSequence text) {
+        int quotes = 0;
+        for (int i = 0; i < text.length(); i++) {
+            if (text.charAt(i) == '"') {
+                quotes++;
+            }
+        }
+        return quotes % 2 == 0;
+    }
+
+    private void parseAndAdd(String record, int lineNumber, List<Entry> result) {
+        try {
+            result.add(parseLine(record));
+        } catch (RuntimeException e) {
+            LogUtil.error("账本文件第 " + lineNumber + " 行无法解析：" + record, e);
+            throw new StorageException(
+                    "账本文件第 " + lineNumber + " 行损坏：" + e.getMessage() + "（" + file.toAbsolutePath() + "）", e);
+        }
     }
 
     @Override
