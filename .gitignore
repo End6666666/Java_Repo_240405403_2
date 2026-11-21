@@ -7,6 +7,9 @@ out/
 logs/
 *.log
 
+# 运行时产生的账本数据：每人本机不同，不入库
+data/
+
 # IDE 本地配置
 .idea/
 *.iml
