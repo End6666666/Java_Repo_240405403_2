@@ -1,18 +1,225 @@
-## Getting Started
+# Private Account Book —— Java 图形化个人信息管理系统
 
-Welcome to the VS Code Java world. Here is a guideline to help you get started to write Java code in Visual Studio Code.
+> Comprehensive Practice 1 · Java 图形化的信息管理系统设计实践
+>
+> 一个用 Java Swing + CSV 文件实现的个人记账本，严格按轻量 MVC 分层，不依赖任何第三方框架（除 JUnit 测试）。
 
-## Folder Structure
+---
 
-The workspace contains two folders by default, where:
+## 一、基本信息
 
-- `src`: the folder to maintain sources
-- `lib`: the folder to maintain dependencies
+| 项目 | 内容 |
+|---|---|
+| 课程作业 | Comprehensive Practice 1 —— Java 图形化的信息管理系统设计实践 |
+| 项目名称 | Private Account Book（私人记账本） |
+| 完成方式 | **独立完成**（作业要求 3 人一组，本人经与任课教师沟通后独立完成） |
+| 作者 | ___（姓名） |
+| 学号 | ___ |
+| 完成日期 | 2026-11-22 |
+| 代码仓库 | https://github.com/End6666666/Java_Repo_240405403_2 |
+| 开发周期 | 2026-11-20 ~ 2026-11-22（约 3 天，课外 4 学时以上） |
 
-Meanwhile, the compiled output files will be generated in the `bin` folder by default.
+---
 
-> If you want to customize the folder structure, open `.vscode/settings.json` and update the related settings there.
+## 二、项目概述
 
-## Dependency Management
+一个单机运行的记账本：录入收入/支出，按关键字和类型查询，随时修改删除，数据存在本地 CSV 文件里，关掉程序再打开数据还在。
 
-The `JAVA PROJECTS` view allows you to manage your dependencies. More details can be found [here](https://github.com/microsoft/vscode-java-dependency#manage-dependencies).
+**技术约束**（按作业要求）：Java Swing 界面、`ArrayList` 内存缓存、文本 CSV 持久化、JUnit4 测试、轻量 MVC，**不用数据库、不引 Spring、不做多线程**。
+
+**几个自己比较在意的实现点**：
+
+- **写盘失败会回滚**：新增/修改/删除都是"先改内存 → 再写文件 → 失败就把内存改回去"，避免内存和文件不一致。
+- **文件写入是原子的**：先写临时文件，再 `ATOMIC_MOVE` 替换，写到一半崩溃也不会把账本截断。
+- **CSV 转义是手写状态机**：备注里有逗号、双引号、换行都能正确往返，不用 `split(",")`。
+- **余额是算出来的，不是存的**：放在 `QueryResult` 里由明细现算，避免"历史记录的余额会变"这种矛盾。
+
+---
+
+## 三、怎么跑起来
+
+### 环境
+
+- JDK 17 及以上（开发时用 JDK 25.0.4.1）
+- 不需要 Maven / Gradle，直接用 `javac` 编译
+
+### 运行程序
+
+```bash
+# 在项目根目录
+javac -encoding UTF-8 -d bin $(find src -name "*.java")
+java -cp bin com.accountbook.App
+```
+
+Windows 下如果不想敲 `find`，也可以在 VS Code 里直接运行 `src/com/accountbook/App.java`。
+
+启动后窗口里：上方是表单（编号只读，日期默认今天），中间是表格，下方是搜索框和按钮，最下面是汇总栏（收入合计 / 支出合计 / 余额 / 条数）。
+
+### 跑测试
+
+```bash
+# 方式一：双击 test.bat
+# 方式二：命令行
+javac -encoding UTF-8 -cp "lib/junit-4.13.2.jar;lib/hamcrest-core-1.3.jar" -d bin $(find src -name "*.java")
+java -cp "bin;lib/junit-4.13.2.jar;lib/hamcrest-core-1.3.jar" \
+     org.junit.runner.JUnitCore \
+     com.accountbook.test.EntryTest com.accountbook.test.QueryResultTest \
+     com.accountbook.test.RepositoryTest com.accountbook.test.ServiceTest
+```
+
+预期输出：`OK (59 tests)`。
+
+---
+
+## 四、必做功能对照
+
+| 作业要求 | 实现情况 | 说明 |
+|---|---|---|
+| 录入（id、日期、类型、类别、金额、备注） | ✅ | id 自动生成，其余表单填写 |
+| 新增 | ✅ | 校验通过后写入并落盘 |
+| 按关键字 + 类型查询 | ✅ | 关键字匹配类别或备注，类型可选 |
+| 修改 | ✅ | 选中记录回填表单，改完保存 |
+| 删除 | ✅ | 选中后删除，二次确认 |
+| 返回 `QueryResult`（明细 + 收入合计 + 支出合计 + 余额 + 条数） | ✅ | `QueryResult` 五个字段全有 |
+| 单条件与组合条件查询 | ✅ | 关键字、类型各自可单独用，也可组合 |
+| `Entry` / `EntityRepository` 接口 `load` / `save` | ✅ | 签名照作业原文，未改动 |
+| 三类自定义异常 | ✅ | `ValidationException` / `BusinessException` / `StorageException` |
+| Controller 统一捕获，禁止空 catch | ✅ | 四级 catch，全部有提示或日志 |
+| `LogUtil` 记录关键操作与异常 | ✅ | 输出到 `logs/app.log` |
+| JUnit4 覆盖正常 / 边界 / 异常 | ✅ | 59 个用例，三层覆盖 |
+| View 只负责界面，不读写文件、不调 Repository | ✅ | View 只暴露字符串 getter，转换交给 Controller |
+
+---
+
+## 五、技术栈与分层
+
+| 层 | 包 | 类 | 职责 |
+|---|---|---|---|
+| 领域层 | `domain` | `Entry`、`EntryType`、`QueryResult` | 数据与单条校验 |
+| 持久化层 | `repository` | `EntryRepository`、`FileEntryRepository` | CSV 读写，包装 IO 异常 |
+| 业务层 | `service` | `AccountBookService`、`AccountBookServiceImpl` | 缓存、跨记录校验、汇总、落盘 |
+| 控制层 | `controller` | `AccountBookController` | 事件绑定、统一异常处理 |
+| 视图层 | `view` | `MainFrame` | Swing 界面 |
+| 异常 | `exception` | 三个自定义异常 | — |
+| 工具 | `util` | `LogUtil` | 日志封装 |
+
+**依赖方向**：`view → controller → service → repository → domain`，单向。下层不 import 上层，`service` 不 import `javax.swing`。
+
+---
+
+## 六、AI 使用说明
+
+### 6.1 用的什么工具
+
+DeepSeek 的 AI 编程助手（对话式 Agent）。使用方式是：我描述需求和约束，它输出代码或文档草稿，我逐行审查后决定采纳、修改还是重写。
+
+**没有使用**：代码补全插件自动生成（Copilot 类）、AI 一键生成项目、AI 自动提交。
+
+### 6.2 各阶段 AI 输出了什么
+
+| 阶段 | AI 输出的内容 | 我的处理 |
+|---|---|---|
+| ① 领域建模 | 三个领域对象的字段与校验规则、余额归属的三个方案对比 | 采纳骨架，**推翻 2 处**（id 校验归属、`round2` 实现） |
+| ② 架构设计 | 包结构、类清单、接口声明、CSV 格式契约 | 采纳，**改 1 处**（异常继承关系与作业表不符） |
+| ③ 编码 | 14 个业务类的第一版代码 | 采纳 6、修改 5、**拒绝 4**（`split(",")`、一律返空、直接覆盖写、空 catch） |
+| ④ 验证 | 4 个测试类共 59 个用例 | 采纳结构，修改 3 处断言；**自己补**了 CSV 换行用例 |
+| ④ 反思 | 注入实验的操作步骤 | 我执行，结论自己写 |
+
+详细记录见 [`docs/05-AI日志.md`](docs/05-AI日志.md)。
+
+### 6.3 人工修改与甄别
+
+五个**实际抓到并修掉**的问题（每一个都能在 git 历史里找到修复记录）：
+
+| # | 问题 | 谁发现的 |
+|---|---|---|
+| 1 | `catch` 顺序反了，校验错误被当成业务错误提示 | 自己读代码 |
+| 2 | 表格排序后选中行取错，**会删错数据** | 自己点界面 |
+| 3 | `Math.round(x*100)/100.0` 把 1.005 算成 1.00 | **JUnit 抓到** |
+| 4 | 备注含换行时写得进、读不回，**整本账本报损坏** | 设计测试用例时想到 |
+| 5 | `LogUtil` 缺单参 `error()`，Controller 编译不过 | 编译报错 |
+
+**五条里只有 1 条是工具自动抓到的**，其余 4 条都靠人想。详细片段与修复过程见 [`docs/03-问题清单.md`](docs/03-问题清单.md)。
+
+### 6.4 自己编写占比
+
+| 类别 | 占比 |
+|---|---|
+| AI 生成、原样采纳 | 约 45% |
+| AI 生成、我修改 | 约 30% |
+| AI 生成、我拒绝并重写 | 约 20% |
+| 完全自己写 | 约 5% |
+
+（口径说明：「原样采纳」多集中在领域对象骨架、异常类、Swing 布局这类"结构固定"的代码；「拒绝重写」集中在 CSV 解析、缓存回滚、异常处理这类"要想清楚失败路径"的代码。）
+
+---
+
+## 七、测试情况
+
+- **59 个 JUnit4 用例**，覆盖领域层、持久化层、业务层，正常/边界/异常三类齐备。
+- 全部通过：`OK (59 tests)`。
+- **三处人工注入实验**验证测试有效性：拿掉回滚行、改回 `Math.round`、取消跨行拼接——三次都精准变红，且都只红 1 条。
+
+详见 [`docs/04-测试报告.md`](docs/04-测试报告.md)。
+
+---
+
+## 八、材料索引
+
+| 编号 | 文件 | 内容 |
+|---|---|---|
+| 01 | [`01-领域模型A版.md`](docs/01-领域模型A版.md) | AI 生成的领域模型初稿 |
+| 01 | [`01-领域模型-同学修改版.md`](docs/01-领域模型-同学修改版.md) | 审查后的修订版 |
+| 01 | [`01-修订说明.md`](docs/01-修订说明.md) | 4 处改动逐条说明 |
+| 02 | [`02-架构A版.md`](docs/02-架构A版.md) | 架构与接口设计初稿 |
+| 02 | [`02-架构与契约对照表.md`](docs/02-架构与契约对照表.md) | 逐条对照作业要求 |
+| 02 | [`02-设计决策记录.md`](docs/02-设计决策记录.md) | 10 个关键决策的选项/选择/理由 |
+| 03 | [`03-代码说明.md`](docs/03-代码说明.md) | 代码结构 + AI 生成记录（逐模块采纳/修改/拒绝） |
+| 03 | [`03-问题清单.md`](docs/03-问题清单.md) | 5 个真实问题：片段/修法/测试结果 |
+| 03 | [`03-测试记录.md`](docs/03-测试记录.md) | 59 用例清单 + 运行日志 |
+| 04 | [`04-测试报告.md`](docs/04-测试报告.md) | 测试策略 + 注入实验 + 手工验证 |
+| 04 | [`04-反思报告.md`](docs/04-反思报告.md) | AI 帮了什么、坑了什么、测试盲区 |
+| 04 | [`04-注入实验原始记录.md`](docs/04-注入实验原始记录.md) | 三段注入的原始输出 |
+| 05 | [`05-AI日志.md`](docs/05-AI日志.md) | 全阶段交互记录表 |
+
+---
+
+## 九、心得体会
+
+**1. AI 给的是速度，不是正确性。**
+
+这次五个真 bug，没有一个是我"想不出来"的——都是"没想到要去看"。AI 写代码时默认一切顺利，`save()` 不会失败、文件不会坏、用户不会乱输。它把"顺利路径"写得又快又漂亮，但所有异常路径都得自己补。
+
+**2. 最危险的不是明显写错的代码，是"看起来标准"的代码。**
+
+`Math.round(x * 100) / 100.0` 这个写法在无数教程里出现过，99% 的情况都对。它错的那 1% 是 1.005 这种值。如果我没写那个"金额正好 1.005"的用例，这个 bug 会一直留着，直到某天汇总金额差一分钱。
+
+**3. 测试的价值不在"通过"，在"逼你想清楚边界"。**
+
+写 `amountOneCentPasses` 的时候我才意识到"0.01 算不算有效金额"这个问题之前根本没想过。59 个用例过了 58 个也照样有价值——那 58 个让我把每个方法的边界都想了一遍。
+
+**4. 人要做的是判断"什么不做"。**
+
+AI 倾向于建议"全都做"：界面加测试、每层都加校验、日志记到每个方法。我判断界面层做自动化测试性价比不划算，就没做，把精力放在回滚和转义这些"错了会丢数据"的地方。这种取舍 AI 不会替你做。
+
+---
+
+## 附：目录结构
+
+```
+Work_4/
+├── src/com/accountbook/
+│   ├── App.java              程序入口
+│   ├── domain/               领域对象
+│   ├── exception/            自定义异常
+│   ├── repository/           CSV 持久化
+│   ├── service/              业务逻辑
+│   ├── controller/           事件协调
+│   ├── view/                 Swing 界面
+│   ├── util/                 日志
+│   └── test/                 4 个测试类
+├── docs/                     01–05 阶段材料
+├── lib/                      JUnit 4.13.2 + Hamcrest 1.3
+├── test.bat                  一键编译 + 测试
+└── data/entries.csv          运行后生成（已 gitignore）
+```
