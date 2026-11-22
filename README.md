@@ -14,7 +14,7 @@
 | 项目名称 | Private Account Book（私人记账本） |
 | 完成方式 | 独立完成 |
 | 作者 | 朱思瀚 |
-| 学号 | ___ |
+| 学号 | 240405403 |
 | 完成日期 | 2026-11-22 |
 | 代码仓库 | https://github.com/End6666666/Java_Repo_240405403_2 |
 | 开发周期 | 2026-11-20 ~ 2026-11-22（约 3 天，课外 4 学时以上） |
@@ -29,7 +29,7 @@
 
 **几个自己比较在意的实现点**：
 
-- **写盘失败会回滚**：新增/修改/删除都是"先改内存 → 再写文件 → 失败就把内存改回去"，避免内存和文件不一致。
+- **写盘失败会回滚**：新增/修改/删除都是"先改内存，再写文件，失败就把内存改回去"，避免内存和文件不一致。
 - **文件写入是原子的**：先写临时文件，再 `ATOMIC_MOVE` 替换，写到一半崩溃也不会把账本截断。
 - **CSV 转义是手写状态机**：备注里有逗号、双引号、换行都能正确往返，不用 `split(",")`。
 - **余额是算出来的，不是存的**：放在 `QueryResult` 里由明细现算，避免"历史记录的余额会变"这种矛盾。
@@ -75,19 +75,19 @@ java -cp "bin;lib/junit-4.13.2.jar;lib/hamcrest-core-1.3.jar" \
 
 | 作业要求 | 实现情况 | 说明 |
 |---|---|---|
-| 录入（id、日期、类型、类别、金额、备注） | ✅ | id 自动生成，其余表单填写 |
-| 新增 | ✅ | 校验通过后写入并落盘 |
-| 按关键字 + 类型查询 | ✅ | 关键字匹配类别或备注，类型可选 |
-| 修改 | ✅ | 选中记录回填表单，改完保存 |
-| 删除 | ✅ | 选中后删除，二次确认 |
-| 返回 `QueryResult`（明细 + 收入合计 + 支出合计 + 余额 + 条数） | ✅ | `QueryResult` 五个字段全有 |
-| 单条件与组合条件查询 | ✅ | 关键字、类型各自可单独用，也可组合 |
-| `Entry` / `EntityRepository` 接口 `load` / `save` | ✅ | 签名照作业原文，未改动 |
-| 三类自定义异常 | ✅ | `ValidationException` / `BusinessException` / `StorageException` |
-| Controller 统一捕获，禁止空 catch | ✅ | 四级 catch，全部有提示或日志 |
-| `LogUtil` 记录关键操作与异常 | ✅ | 输出到 `logs/app.log` |
-| JUnit4 覆盖正常 / 边界 / 异常 | ✅ | 59 个用例，三层覆盖 |
-| View 只负责界面，不读写文件、不调 Repository | ✅ | View 只暴露字符串 getter，转换交给 Controller |
+| 录入（id、日期、类型、类别、金额、备注） | 已完成 | id 自动生成，其余表单填写 |
+| 新增 | 已完成 | 校验通过后写入并落盘 |
+| 按关键字 + 类型查询 | 已完成 | 关键字匹配类别或备注，类型可选 |
+| 修改 | 已完成 | 选中记录回填表单，改完保存 |
+| 删除 | 已完成 | 选中后删除，二次确认 |
+| 返回 `QueryResult`（明细 + 收入合计 + 支出合计 + 余额 + 条数） | 已完成 | `QueryResult` 五个字段全有 |
+| 单条件与组合条件查询 | 已完成 | 关键字、类型各自可单独用，也可组合 |
+| `Entry` / `EntityRepository` 接口 `load` / `save` | 已完成 | 签名照作业原文，未改动 |
+| 三类自定义异常 | 已完成 | `ValidationException` / `BusinessException` / `StorageException` |
+| Controller 统一捕获，禁止空 catch | 已完成 | 四级 catch，全部有提示或日志 |
+| `LogUtil` 记录关键操作与异常 | 已完成 | 输出到 `logs/app.log` |
+| JUnit4 覆盖正常 / 边界 / 异常 | 已完成 | 59 个用例，三层覆盖 |
+| View 只负责界面，不读写文件、不调 Repository | 已完成 | View 只暴露字符串 getter，转换交给 Controller |
 
 ---
 
@@ -103,7 +103,7 @@ java -cp "bin;lib/junit-4.13.2.jar;lib/hamcrest-core-1.3.jar" \
 | 异常 | `exception` | 三个自定义异常 | — |
 | 工具 | `util` | `LogUtil` | 日志封装 |
 
-**依赖方向**：`view → controller → service → repository → domain`，单向。下层不 import 上层，`service` 不 import `javax.swing`。
+**依赖方向**：view 调 controller，controller 调 service，service 调 repository，repository 用 domain，单向。下层不 import 上层，`service` 不 import `javax.swing`。
 
 ---
 
